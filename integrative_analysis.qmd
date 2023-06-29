@@ -1,0 +1,185 @@
+---
+title: "Epression data analysis"
+author: "Izar de Villasante"
+---
+
+# Loading data:
+
+## Sample sheet
+
+```{r}
+library(data.table)
+ss <- data.table::fread("data/samplesheet_meth_exprs.csv")
+betas<-readRDS("data/betas_xprs.rds")
+DMP_prom <- readRDS("data/DMP_prom.rds")
+```
+
+## Expression:
+
+### Samples:
+
+```{r}
+namedlist <- function(...) {
+  nl <- list(...)
+  argnames <- sys.call()
+  n<-sapply(argnames[-1], as.character)
+  names(nl)<-n
+
+  
+  return(nl)
+  }
+
+library(readxl)
+library(data.table)
+counts<-list()
+Tat72_off <- readxl::read_xlsx("data-raw/Transcriptome_HClinic_Vcasanova_20042023/Tat72VSTetOFF.xlsx", sheet = 1)
+colnames(Tat72_off) <- c("gene",sapply(colnames(Tat72_off),function(x)unlist(strsplit(x,"\\."))[7])[-1])
+
+
+Tat_Tat72 <- readxl::read_xlsx("data-raw/Transcriptome_HClinic_Vcasanova_20042023/TatVSTat72.xlsx", sheet = 1)
+colnames(Tat_Tat72) <- c("gene",sapply(colnames(Tat_Tat72),function(x)unlist(strsplit(x,"\\."))[7])[-1])
+
+Tat_off <- readxl::read_xlsx("data-raw/Transcriptome_HClinic_Vcasanova_20042023/TatVSTetOFF.xlsx", sheet = 1)
+colnames(Tat_off) <- c("gene",sapply(colnames(Tat_off),function(x)unlist(strsplit(basename(x),"\\."))[1])[-1])
+
+counts <-namedlist(Tat72_off,Tat_Tat72,Tat_off)
+
+```
+
+### DEGs:
+
+```{r}
+library(readxl)
+library(data.table)
+
+Tat72_off <- readxl::read_xlsx("data-raw/Transcriptome_HClinic_Vcasanova_20042023/Tat72VSTetOFF.xlsx", sheet = 2)
+Tat72_off$Contrast="Tat72_off"
+Tat_Tat72 <- readxl::read_xlsx("data-raw/Transcriptome_HClinic_Vcasanova_20042023/TatVSTat72.xlsx", sheet = 2)
+Tat_Tat72$Contrast="Tat_Tat72"
+Tat_off <- readxl::read_xlsx("data-raw/Transcriptome_HClinic_Vcasanova_20042023/TatVSTetOFF.xlsx", sheet = 2)
+Tat_off$Contrast="Tat_off"
+
+```
+
+```{r}
+dt_DEGs <- data.table::data.table(rbind(Tat_Tat72,Tat72_off,Tat_off))
+dt_DEGs <- dt_DEGs[RealFC<0.5 | RealFC >2,]
+```
+
+
+## Methylation:
+
+"El primer objetivo es ver si la proteína TAT del VIH, induce cambios en el metiloma. La proteína TAT está codificada por 2 exones que realizan funciones diferentes y queremos además aislar el efecto de cada uno, por eso hemos generado unas líneas celulares de jurkat establemente transfectadas con:
+
+a) Un vector vacío que será nuestro control: muestras 1, 7 y 13 (triplicados)
+b) Un vector con la proteína TAT completa: muestras 3, 9 y 14 (triplicados)
+c) Un vector con solo el primer exón de TAT: muestras 5, 11 y 16 (triplicados)
+
+La comparativa entre estos tres grupos es la primera que nos interesa. a-b, a-c y b-c."
+
+
+Por otro lado, la DOXYCICLINA "apaga" la expresión de TAT y el segundo objetivo entonces es ver si el "apagado" de TAT con la DOXY hace algún cambio en el metiloma. Por eso la comparativa aquí sería cada una de las tres líneas anteriores con y sin DOXY, así que tendremos además las siguientes muestras:
+
+d) Un vector vacío que será nuestro control + DOXY: muestras 2 y 8 (duplicados)
+e) Un vector con con la proteína TAT completa + DOXY: muestras 4, 10 y 15 (triplicados)
+f) Un vector con solo el primer exón de TAT + DOXY: muestras 6 y 12 (duplicados)
+
+La segunda comparativa que nos interesa, por tanto, es. a-d, b-e y c-f.
+
+While the first objective yielded positive results no difference was found for the second (Doxi) apporach.
+ 
+### Overview:
+
+PCR plots:
+
+![PCA](results/full/plots/pca/bplots/colored.by.Condition_shape.Type1.png)
+
+
+### DMRS:
+
+```{r}
+dmrs<-tar_read(dmrs_full)
+dmrs[Contrast=="Control_No-TAT_No",]
+```
+
+### DMPS:
+
+```{r}
+dmps <-tar_read(dmps_f_full)
+dmps[Contrast=="Control_No-TAT_No",]
+```
+
+# Correlation:
+
+## DEGs vs methylation CpGs
+
+Correlation analysis between CpGs and genes.
+
+To examine the impact of DNA methylation on the local regulation of gene expression, the Pearson correlation (r) was calculated between the β values of CpGs located in promoter regions and the normalized expression values of the corresponding genes. 
+
+First we subset the probes to select only those that are differentially methylated (0.4 difference in beta value & pval > 0.05) and fall in the promoter region: 
+
+```{r}
+#| eval: false
+# CpGs located in promoter regions
+f <- function(x) {list("a","b")}
+DMP_prom <- dmps[UCSC_RefGene_Group %like% c("TSS"),]
+
+
+# Possibility of multiple genes and genomic location per probe
+dt_list<- lapply(
+  DMP_prom$rn,function(cg){  # For every position or ProbeID do:     
+    UCSC <- data.table(      # 1. generate a data.table (per row)
+      DMP_prom[rn==cg,       # 2. split UCSC gene and position    
+               lapply(       # 3. new row for every combination of gene/position
+                 .SD,        # 4. add Contrast porbeID and bval difference
+                 function(x)unlist(strsplit(x,";"))
+                 )
+               ,by=c("Contrast","rn","diff_meanMeth")
+               ,.SDcols=c("UCSC_RefGene_Name","UCSC_RefGene_Group")]
+      )
+    })
+# 5. rbind all together:
+DMP_prom <- rbindlist(dt_list)|> unique()
+# 6. Discard genes outside promoter:
+DMP_prom <- DMP_prom[UCSC_RefGene_Group %like% "TSS" | UCSC_RefGene_Group == "5'UTR",]
+DMP_prom$Gene<-DMP_prom$UCSC_RefGene_Name
+DMP_prom$UCSC_RefGene_Name<-NULL
+saveRDS(DMP_prom,"data/DMP_prom.rds")
+
+```
+
+Now we can select all the genes present in DEGs with DMPs in the promoter:
+
+```{r}
+dt_DEG_prom <- merge(DMP_prom,dt_DEGs,by="Gene")
+# genes_DEG_prom <- intersect(dt_DEGs$Gene  , DMP_prom$UCSC_RefGene_Name)
+# length(genes_DEG_prom)
+dt_DEG_prom[,.(
+  positive =sum(RealFC>2),
+  negative =sum(RealFC<0.5),
+  Hyper = sum(diff_meanMeth > 0),
+  Hypo = sum(diff_meanMeth < 0),
+  positive_Hyper=sum(RealFC>2 & diff_meanMeth > 0),
+  positive_Hypo=sum(RealFC>2 & diff_meanMeth < 0),
+  negative_Hyper=sum(RealFC<0.5 & diff_meanMeth > 0),
+  negative_Hypo=sum(RealFC<0.5 & diff_meanMeth < 0)
+)
+,by=c("Contrast.x","Contrast.y")]
+```
+```{r}
+dt_DEG_prom <- merge(DMP_prom,dt_DEGs,by="Gene")
+```
+
+
+
+Note that a gene can be linked via multiple CpGs in its promoter, and thus, the correlation was calculated for each CpG-gene pair. |r|>0.3 and an adjusted p-value <0.05 were set as the cutoffs for a significant correlation.
+
+```{r}
+dt<-dt_DEGs[,.SD,.SDcols=c("Gene","RealFC","Contrast")]
+```
+
+
+## DMPs vs expression
+
+## Geneset 

@@ -139,7 +139,7 @@ targets <- tar_map(
   tar_target(dmrs1, find_dmrs(betas,model,fdr = 0.25, p.value = 0.1,betacutoff = 0.1, min.cpg=3)),
   tar_target(dmrs_battery,apply_filter_dmrs(dmrs = dmrs1,path=paste0(fparams$dmrs_folder,data_names))),
   tar_target(dmrs_par_plot,apply_filter_dmrs),
-  tar_target(dmrs, filter_dmrs(dmrs1,p.value = 0.1, mDiff = 0.25, min.cpg=3)),
+  tar_target(dmrs, filter_dmrs(dmrs1,p.value = 0.05, mDiff = 0.2, min.cpg=3)),
   
   tar_target(save_dmrs,
              writexl::write_xlsx(as.data.frame(dmrs),
@@ -154,10 +154,16 @@ targets <- tar_map(
   tar_target(allpathways, gopath(dmrs,all.cpg=rownames(betas),n=Inf,ann=ann)),
   tar_target(hyperpathways, gopath(dmrs[meandiff>0,],all.cpg=rownames(betas),n=Inf,ann=ann,savepath=paste0(fparams$pathway_folder,"pathways_hyper.csv"))),
   tar_target(hypopathways, gopath(dmrs[meandiff<0,],all.cpg=rownames(betas),n=Inf,ann=ann,savepath=paste0(fparams$pathway_folder,"pathways_hypo.csv"))),
-  #
-  # tar_target(save_gopath,
-  #            writexl::write_xlsx(pathways[FDR<1,],
-  #                                paste0(fparams$pathway_folder,data_names,"_Pathways.xlsx"))),
+
+  tar_target(save_gopath,
+             writexl::write_xlsx(allpathways[FDR<1,],
+                                 paste0(fparams$pathway_folder,data_names,"_all_Pathways.xlsx"))),
+  tar_target(save_gopathhyper,
+             writexl::write_xlsx(hyperpathways[FDR<1,],
+                                 paste0(fparams$pathway_folder,data_names,"_hyper_Pathways.xlsx"))),
+  tar_target(save_gopathhypo,
+             writexl::write_xlsx(hypopathways[FDR<1,],
+                                 paste0(fparams$pathway_folder,data_names,"_hypo_Pathways.xlsx"))),
   NULL
 )
 # # list(

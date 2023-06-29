@@ -13,7 +13,7 @@ suppressMessages({
   library(clustermq)
   library(RcppParallel)
 })
-
+source("./R/deps.R")
 ## configuration for docopt
 doc <- "Usage: run.R [-h] [-x] [-n NCORES] [-s SCHEDULER]
 -n --ncores NCORES          Number of threads to use 

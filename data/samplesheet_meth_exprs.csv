@@ -11,7 +11,7 @@ HC-SEN_13,TetOFF_3,No,Control
 HC-SEN_8,TetOFFDOX,Dox,Control
 HC-SEN_2,TetOFFDOX,Dox,Control
 HC-SEN_6,Tat72DOX,Dox,Exon1
-HC-SEN_12Tat72DOX,,Dox,Exon1
-HC-SEN_11,Tat72_1,No,Exon1
-HC-SEN_16,Tat72_1,No,Exon1
+HC-SEN_12,Tat72DOX,Dox,Exon1
+HC-SEN_11,Tat72_2,No,Exon1
+HC-SEN_16,Tat72_3,No,Exon1
 HC-SEN_5,Tat72_1,No,Exon1

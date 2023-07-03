@@ -12,6 +12,8 @@ library(data.table)
 ss <- data.table::fread("data/samplesheet_meth_exprs.csv")
 betas<-readRDS("data/betas_xprs.rds")
 DMP_prom <- readRDS("data/DMP_prom.rds")
+ss_cont <- data.table()
+ss_cont[]
 ```
 
 ## Expression:

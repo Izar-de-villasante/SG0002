@@ -3,22 +3,114 @@ title: "Epression data analysis"
 author: "Izar de Villasante"
 ---
 
+```{r dtable function}
+#| include: false
+#| eval: true
+dtable<-function(data){
+  DT::datatable(
+        { data},
+        filter = 'top',
+        # selection = list(mode = 'multiple', selected = c(1:10), target = 'column', selectable = c(-2, -3)),
+        fillContainer = F,
+        # style =  "bootstrap",
+
+        extensions = 'Buttons',
+
+        options = list(
+          paging = TRUE,
+          pageLength = 10,
+          searching = TRUE,
+          fixedColumns = TRUE,
+          autoWidth = FALSE,
+          scrollX=TRUE,
+          digits=4,
+          ordering = TRUE,
+          dom = 'Bfrtip',
+          buttons = list(
+            list(
+              extend = "collection",
+              text = 'download entire dataset',
+              action = DT::JS("function ( e, dt, node, config ) {
+                                                    Shiny.setInputValue('test', true, {priority: 'event'});
+                                                    }")
+            ),
+            'copy',
+            'csv',
+            'excel'
+          ),
+
+          class = "display",
+          server=TRUE
+        ),
+      ) |> DT::formatRound(which(sapply(data,is.double)),4)
+}
+```
+
+```{r dtable function server}
+#| include: false
+#| eval: true
+#| context: server
+myModal <- function() {
+
+  div(id = "test",
+      shiny::modalDialog(downloadButton("download1","Download data as csv"),
+                         br(),
+                         br(),
+                         downloadButton("download2","Download data as excel"),
+                         easyClose = TRUE, title = "Download Table")
+  )
+}
+
+renderDT<- function(data){
+  output$dtable <- DT::renderDataTable({
+    dtable(data)
+  })
+  
+
+    shiny::observeEvent(input$test, {
+      print("hello")
+      showModal(myModal())
+    })
+    output$download1 <- shiny::downloadHandler(
+      filename = function() {
+        paste("data-", Sys.Date(), ".csv", sep="")
+      },
+      content = function(file) {
+        write.csv(data, file)
+      }
+    )
+
+    output$download2 <- shiny::downloadHandler(
+      filename = function() {
+        paste("data-", Sys.Date(), ".xlsx", sep="")
+      },
+      content = function(file) {
+        writexl::write_xlsx(data, file)
+      })
+}
+
+```
+
+
 # Loading data:
 
 ## Sample sheet
 
 ```{r}
+#| include: false
 library(data.table)
 ss <- data.table::fread("data/samplesheet_meth_exprs.csv")
 betas<-readRDS("data/betas_xprs.rds")
 DMP_prom <- readRDS("data/DMP_prom.rds")
-ss_cont <- data.table()
-ss_con
+dt_cor <- readRDS("data/dt_cor.rds")
+DMRs <- readRDS("data/DMRs.rds")
+DMR_DEG_plots <- readRDS("data/DMR_DEG_plots.rds")
+
 ```
 
 ## Expression:
 
-### Samples:
+### Counnts:
 
 ```{r}
 namedlist <- function(...) {
@@ -54,7 +146,12 @@ counts <-namedlist(Tat72_off,Tat_Tat72,Tat_off)
 
 ```
 
-### DEGs:
+```{r}
+dtable(counts[[1]])
+```
+
+
+## DEGs:
 
 ```{r}
 library(readxl)
@@ -74,6 +171,9 @@ dt_DEGs <- data.table::data.table(rbind(Tat_Tat72,Tat72_off,Tat_off))
 # dt_DEGs <- dt_DEGs[RealFC<0.5 | RealFC >2,]
 ```
 
+```{r}
+dtable(dt_DEGs)
+```
 
 ## Methylation:
 
@@ -106,6 +206,8 @@ PCR plots:
 ### DMRS:
 
 ```{r}
+#| eval: false
+
 dmrs<-readRDS("data/dmrs.rds")
 ano_cols<-c("seqnames","start","end","width","no.cpgs","HMFDR","meandiff","Contrast")
 dt_list<- lapply(
@@ -138,12 +240,11 @@ DMRs<-rbind(c1,c2,c3)
 saveRDS(DMRs,"data/DMRs.rds")
 ```
 
-### DMPS:
 
 ```{r}
-dmps <-tar_read(dmps_f_full)
-dmps[Contrast=="Control_No-TAT_No",]
+dtable(DMRs)
 ```
+
 
 # Correlation:
 
@@ -154,7 +255,7 @@ dmps[Contrast=="Control_No-TAT_No",]
 ```{r}
 dt_DEG_DMR <- merge(DMRs,dt_DEGs,by=c("Gene","Contrast"),all = T)
 tab <- dt_DEG_DMR[,.(DEGs=sum(!is.na(ID)),DMRs=sum(!is.na(start)),overlap=sum(!(is.na(start)) &!(is.na(ID)) )),by=c("Contrast")]
-tab
+kableExtra::kbl(tab)|>kableExtra::kable_classic_2()
 ```
 
 ### Venn diagrams:
@@ -174,9 +275,10 @@ Now we want to get the mean beta value for each sample in the dmr location:
 ol <- dt_DEG_DMR[!(is.na(start)) &!(is.na(ID)),]
 ```
 
-1. Find all cpg that fall in the dmr
 
 ```{r}
+#| eval: false
+
 library(data.table)
 library(GenomicRanges)
 library(IlluminaHumanMethylationEPICanno.ilm10b2.hg19)
@@ -204,8 +306,105 @@ dt_DEG_DMR_intersect<-lapply(1:NROW(ol),function(nr){
   dt$cor.pval <- cor$p.value
   return(dt)
   })|>rbindlist()
+dt_DEG_DMR_intersect[,grp:=tstrsplit(SID,"_",keep = 1)]
+```
+
+```{r}
+#| eval: false
+dt_cor <-dt_DEG_DMR_intersect
+setorder(dt_cor,cor.pval,Gene)
+saveRDS(dt_cor,"data/dt_cor.rds")
 
 ```
+
+#### Table for DMR & DEG:
+
+In the following table the values for methylation and expression are integrated: 
+
+```{r}
+dtable(dt_cor[,.SD,.SDcols=c("Gene","Contrast","SID","DMR.meth","TPM","correlation","cor.pval")])
+```
+
+### Plots
+
+```{r}
+#| eval: false
+
+library(ggplot2)
+library(data.table)
+library(ggpubr)
+library(ggrepel)
+DMR_DEG_plots <- list()
+plots_folder <- "analysis/Integration_with_expression/DEGvsDMR/pval"
+dir.create(plots_folder,recursive = T,showWarnings = F)
+setkeyv(dt_cor,c("cor.pval","Gene","width"))
+
+for(cont in unique(dt_cor$Contrast)){
+  dt<-head(dt_cor[Contrast==cont,],60)
+  lg <- dt[,.(gene=unique(Gene),width=unique(width)),by=cor.pval] 
+  
+  plist <- lapply(1:NROW(lg),function(nr){
+    pdata <- dt_cor[lg[nr,]]
+    plot_name <- paste0("/DEG_DMR.pval_", nr, ".png")
+    plt_path <- paste(plots_folder, cont, sep = .Platform$file.sep) 
+    dir.create(plt_path,recursive = T,showWarnings = F)
+    p<-ggplot(data=pdata, aes(x=as.numeric(TPM),y=as.numeric(DMR.meth),colour=SID)) +
+    geom_point(aes(shape=grp),size=8,alpha=0.6) +
+    xlab("Mean DMR methylation") + ylab("Transcripts x Milion") +
+
+    geom_smooth(method = "lm",
+                inherit.aes = F,
+                aes(x=as.numeric(pdata$TPM),y=as.numeric(pdata$DMR.meth)),
+                linetype="dashed",
+                se=F)+
+    
+    annotate(geom = "text",
+             x = -Inf, y = Inf,
+             label=paste0("correlation: ", round(unique(pdata$correlation),4), ", p-value: ", round(unique(pdata$cor.pval),8)),
+             hjust = 0, vjust = 1
+             )  +
+
+    ggtitle(paste0(" Correlation between expression and methylation for gene: ",unique(pdata$Gene)))
+    ggsave(path = plt_path, filename = plot_name, plot=p)
+    return(p)
+  })
+  DMR_DEG_plots[[cont]] <- plist
+  }
+saveRDS(DMR_DEG_plots,"data/DMR_DEG_plots.rds")
+
+```
+
+#### Tat_Tat72
+
+```{r}
+#| column: screen-inset-right
+#| layout-ncol: 2
+#| results: hide 
+#| fig-keep: all
+DMR_DEG_plots[["Tat_Tat72"]]
+```
+
+
+#### Tat_off
+
+```{r}
+#| column: screen-inset-right
+#| layout-ncol: 2
+#| results: hide 
+#| fig-keep: all
+DMR_DEG_plots[["Tat_off"]]
+```
+
+#### Tat72_off
+
+```{r}
+#| column: screen-inset-right
+#| layout-ncol: 2
+#| results: hide 
+#| fig-keep: all
+DMR_DEG_plots[["Tat72_off"]]
+```
+
 
 
 ## Geneset 
@@ -217,6 +416,13 @@ dt_DEG_DMR_intersect<-lapply(1:NROW(ol),function(nr){
 
 
 
+<!-- ### DMPS: -->
+
+<!-- ```{r} -->
+<!-- #| eval: false -->
+<!-- dmps <-tar_read(dmps_f_full) -->
+<!-- dmps[Contrast=="Control_No-TAT_No",] -->
+<!-- ``` -->
 
 
 <!-- ## DEGs vs methylation CpGs -->

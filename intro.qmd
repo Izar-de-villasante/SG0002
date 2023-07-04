@@ -1,5 +1,9 @@
 # Introduction
 
-This is a book created from markdown and executable code.
+This book is created to present the integration of methylation and expression data for the HIV TAT protein project.
 
-See @knuth84 for additional discussion of literate programming.
+Colaborator name1: Victor Casanova  
+
+Colaborator name2: Andrea Rodriguez
+
+Date: 04 / 07 / 2023

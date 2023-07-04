@@ -1,5 +1,5 @@
 ---
-title: "Epression data analysis"
+title: "Expression data analysis"
 author: "Izar de Villasante"
 ---
 
@@ -91,7 +91,7 @@ renderDT<- function(data){
 
 ```
 
-
+::: {.panel-tabset}
 # Loading data:
 
 ## Sample sheet
@@ -107,6 +107,24 @@ DMRs <- readRDS("data/DMRs.rds")
 DMR_DEG_plots <- readRDS("data/DMR_DEG_plots.rds")
 
 ```
+
+
+The correspondence between the methylome and transcriptome names are:
+
+    - vector with FULL protein (without doxy): "Tat" (RNAseq [Tat_1, Tat_2, Tat_3]) = "TAT_NO" (microarrays [HC_SEN 3,9,14])
+    - vector with PARTIAL protein (without doxy):"Tat72" (RNAseq [Tat72_1, Tat72_2, Tat72_3]) = "Exon1_No" (microarrays [HC_SEN 5,11,16]) 
+
+    - vector with FULL protein (with doxy): "TatDOX" (RNAseq [TatDOX_1, TatDOX_2, TatDOX_3]) = "TAT_Dox" (microarrays [HC_SEN 4,10,15])
+    - vector with PARTIAL protein (with doxy): "Tat72DOX" (RNAseq [Tat72DOX_1, Tat72DOX_2, Tat72DOX_3]) = "Exon1_Dox" (microarrays [HC_SEN 6,12])
+
+    - vector without protein (empty): "TetOFF" (RNAseq [TetOFF_1, TetOFF_2, TetOFF_3]) = "Control_NO" (microarrays [HC_SEN 1,7,13])
+    - vector without protein (empty) + doxy: "TetOFFDOX" (RNAseq [TetOFFDOX_1, TetOFFDOX_2, TetOFF_3]) = "Control_Dox" (microarrays [HC_SEN 2,8])
+    
+
+```{r}
+dtable(ss)
+```
+
 
 ## Expression:
 
@@ -196,7 +214,7 @@ La segunda comparativa que nos interesa, por tanto, es. a-d, b-e y c-f.
 
 While the first objective yielded positive results no difference was found for the second (Doxi) apporach.
  
-### Overview:
+### PCA plot:
 
 PCR plots:
 
@@ -244,6 +262,7 @@ saveRDS(DMRs,"data/DMRs.rds")
 ```{r}
 dtable(DMRs)
 ```
+
 
 
 # Correlation:
@@ -407,8 +426,7 @@ DMR_DEG_plots[["Tat72_off"]]
 
 
 
-## Geneset 
-
+:::
 
 
 

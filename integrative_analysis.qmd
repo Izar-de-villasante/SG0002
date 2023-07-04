@@ -375,7 +375,8 @@ for(cont in unique(dt_cor$Contrast)){
                 inherit.aes = F,
                 aes(x=as.numeric(pdata$TPM),y=as.numeric(pdata$DMR.meth)),
                 linetype="dashed",
-                se=F)+
+                se=F,
+                formula = "y ~ x")+
     
     annotate(geom = "text",
              x = -Inf, y = Inf,

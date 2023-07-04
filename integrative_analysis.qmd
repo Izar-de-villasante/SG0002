@@ -200,7 +200,7 @@ While the first objective yielded positive results no difference was found for t
 
 PCR plots:
 
-![PCA](results/full/plots/pca/bplots/colored.by.Condition_shape.Type1.png)
+![PCA](data/colored.by.Condition_shape.Type1.png)
 
 
 ### DMRS:

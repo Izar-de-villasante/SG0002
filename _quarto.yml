@@ -18,8 +18,18 @@ format:
   html:
     self-contained: true
     embed-resources: true
+    page-layout: full
     theme: cosmo
-
-
+    grid:
+      sidebar-width: 300px
+      body-width: 1200px
+      margin-width: 100px
+      gutter-width: 1.5rem
+# 
+# geometry:
+#   - left=.5in
+#   - textwidth=4.5in
+#   - marginparsep=.25in
+#   - marginparwidth=1.25in
 
 

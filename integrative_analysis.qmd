@@ -107,6 +107,20 @@ dt_cor <- readRDS("data/dt_cor.rds")
 DMRs <- readRDS("data/DMRs.rds")
 DMR_DEG_plots <- readRDS("data/DMR_DEG_plots.rds")
 
+path_results<-function(pathway,topN=50,method="method",pval=0.05,path="results/pathways.csv",cols=NULL){
+  # pathway<-pathway[FDR<1,]
+  pathway$method<-pathway[[method]]
+  data.table::setorder(pathway,method,FDR)
+  sig_idx <- pathway[,.I[FDR < pval]  ,by=method]$V1
+  head_idx<-pathway[,.I[1:min(..topN,.N)],by=c(method,"Contrast")]$V1
+  res<-pathway[base::union(sig_idx,head_idx),]
+  # res[,TERM:=ifelse(FDR<pval,paste0("*** ",TERM," ***"),TERM)]
+  # data.table::fwrite(res,path)
+  results<-res[,.SD,.SDcols=c("Contrast","FDR",cols,"TERM","method")]
+  data.table::setorder(results,Contrast,method,FDR)
+  return(results)
+}
+
 ```
 
 The correspondence between the methylome and transcriptome names are:
@@ -361,6 +375,7 @@ dt_DEG_DMR_intersect[,grp:=tstrsplit(SID,"_",keep = 1)]
 #| eval: false
 dt_cor <-dt_DEG_DMR_intersect
 setorder(dt_cor,cor.pval,Gene)
+dt_cor <- dt_cor[,lapply(.SD,function(x)if(is.character(x))as.factor(x)else(x))]
 saveRDS(dt_cor,"data/dt_cor.rds")
 
 ```
@@ -454,19 +469,14 @@ DMR_DEG_plots[["Tat_off"]]
 DMR_DEG_plots[["Tat72_off"]]
 ```
 
-### Pathway analysis
+# Pathway analysis
 
 The pathways analysis will be performed analysing 2 sets of genes: 1.
 `Full` DMR/DMPs: the full set of significant diferentially methylated &
 expressed genes. 2. `Cor.sig`: A subset of the above where the
 correlation p.value is smaller than 0.05
 
-#### Full
-
-This dataset is not filtered by the strength of the correlation between
-DMRs and DEGs.
-
-##### DNA methylation context:
+## DNA methylation context:
 
 Although the relationship between DNA methylation and gene expression is
 complex and the mechanisms involved in gene regulation by DNA
@@ -497,14 +507,24 @@ tab.full <- dt_cor[,.(negative.cor=sum(correlation<0)/6,positive.cor=sum(correla
 kableExtra::kbl(tab.full)|>kableExtra::kable_classic_2()
 ```
 
-::: callout-warning
+::: callout-warning{.column-page-inset}
 Be aware that DMGs are based on DMRs. More than one DMR can be mapped to
 the same gene. Therefore, there can be more than one pair of DMG/DEG for
-the same gene.
+the same gene as it happens for `LTBP1` gene in `Tat72_off` contrast.
+
+|Contrast |seqnames|start    |end      |no.cpgs|width|gene_element                     |gene_location|Gene   |
+|---------|--------|---------|---------|-------|-----|---------------------------------|-------------|-------|
+|Tat72_off|chr13   | 67551364| 67551521| 3     | 158 |TSS200;Body;Body                 |promoter     |PCDH9  |
+|Tat72_off|chr3    | 15311021| 15311269| 4     | 249 |Body;5'UTR                       |intragenic   |SH3BP5 |
+|Tat72_off|chr5    |172070871|172072282| 3     |1412 |Body                             |intragenic   |NEURL1B|
+|Tat72_off|chr3    |116163694|116164943|13     |1250 |5'UTR;1stExon;TSS200;Body;TSS1500|promoter     |LSAMP  |
+|Tat72_off|chr4    |157713603|157714561| 3     | 959 |Body                             |intragenic   |PDGFC  |
+|Tat72_off|chrY    | 21877683| 21878594| 3     | 912 |Body;ExonBnd                     |intragenic   |KDM5D  |
+|Tat72_off|chr2    | 33495871| 33495908| 3     |  38 |Body                             |intragenic   |LTBP1  |
+|Tat72_off|chr2    | 33216742| 33217280| 3     | 539 |Body                             |intragenic   |LTBP1  |
 
 :::
 
-`r kableExtra::kbl(dt_cor[Contrast=="Tat72_off",unique(Gene),by="width"]) `
 
 In the case of our data there are more positive than negative
 correlations. You can inspect the data in the following table:
@@ -513,7 +533,14 @@ correlations. You can inspect the data in the following table:
 dtable(dt_cor[,.SD,.SDcols=c("Gene","Contrast","width","SID","DMR.meth","TPM","correlation","cor.pval","gene_element", "gene_location")])
 ```
 
-##### Pathways
+
+## Full
+
+This dataset is not filtered by the strength of the correlation between
+DMRs and DEGs.
+
+
+### Pathways
 
 ```{r}
 
@@ -555,7 +582,7 @@ dtable(Pathway_Full)
 
 As you can see the terms are rather general. Let's try to filter based on the direction of correlation + / -:
 
-###### Positive:
+#### Positive:
 
 ```{r}
 dt_pos <- dt_cor[correlation>0,]
@@ -580,7 +607,7 @@ dtable(Pathway_Full_Pos)
 ```
 
 
-###### Negative:
+#### Negative:
 
 ```{r}
 dt_neg <- dt_cor[correlation>0,]
@@ -605,6 +632,93 @@ dtable(Pathway_Full_neg)
 ```
 
 
+## cor.sig
+
+This dataset is not filtered by the strength of the correlation between
+DMRs and DEGs.
+
+
+### Pathways
+
+```{r}
+dt.sig <-  dt_cor[cor.pval<0.05 ,.(correlation=unique(correlation)),by=c("Contrast","Gene","width")]
+
+
+library(gprofiler2)
+pathways_full <- lapply(unique(dt.sig$Contrast),function(cont){
+  library(gprofiler2)
+  library(data.table)
+   p<-gprofiler2::gost(signif = T ,unique(dt.sig[Contrast==cont,Gene]))[[1]]
+   if(!is.null(p)){
+    dth<- data.table::as.data.table(p)
+    dth[,FDR:=p_value]
+    dth[,TERM:=term_name]
+    dth[,source:=factor(source)]
+    dth[,Contrast:=cont]
+   }
+  })
+Pathway_Full<-path_results(rbindlist(pathways_full),method="source",cols = c("term_size","query_size","intersection_size"))
+saveRDS(Pathway_Full,"data/pathway_full_sig.rds")
+```
+
+```{r}
+dtable(Pathway_Full)
+
+```
+
+As you can see the terms are rather general. Let's try to filter based on the direction of correlation + / -:
+
+#### Positive:
+
+```{r}
+dt_pos <- dt.sig[correlation>0,]
+pathways_full_positive <- lapply(unique(dt_pos$Contrast),function(cont){
+  library(gprofiler2)
+  library(data.table)
+   p<-gprofiler2::gost(signif = T ,unique(dt_pos[Contrast==cont,Gene]))[[1]]
+   if(!is.null(p)){
+    dth<- data.table::as.data.table(p)
+    dth[,FDR:=p_value]
+    dth[,TERM:=term_name]
+    dth[,source:=factor(source)]
+    dth[,Contrast:=cont]
+   }
+  })
+Pathway_Full_Pos<-path_results(rbindlist(pathways_full_positive),method="source",cols = c("term_size","query_size","intersection_size"))
+saveRDS(Pathway_Full_Pos,"data/pathway_full_positive_sig.rds")
+```
+
+```{r}
+dtable(Pathway_Full_Pos)
+```
+
+
+#### Negative:
+
+```{r}
+dt_neg <- dt.sig[correlation>0,]
+pathways_full_negitive <- lapply(unique(dt_neg$Contrast),function(cont){
+  library(gprofiler2)
+  library(data.table)
+   p<-gprofiler2::gost(signif = T ,unique(dt_neg[Contrast==cont,Gene]))[[1]]
+   if(!is.null(p)){
+    dth<- data.table::as.data.table(p)
+    dth[,FDR:=p_value]
+    dth[,TERM:=term_name]
+    dth[,source:=factor(source)]
+    dth[,Contrast:=cont]
+   }
+  })
+Pathway_Full_neg<-path_results(rbindlist(pathways_full_negitive),method="source",cols = c("term_size","query_size","intersection_size"))
+saveRDS(Pathway_Full_neg,"data/pathway_full_negative_sig.rds")
+```
+
+```{r}
+dtable(Pathway_Full_neg)
+```
+
+
+:::
 
 <!-- ```{r} -->
 <!-- # get_pathway<-function(probeIDs,dt){ -->
